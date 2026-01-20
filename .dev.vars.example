@@ -1,0 +1,8 @@
+# Development Environment Variables for OG Worker
+# Copy this to .dev.vars for local development
+
+# Base URL for the main app
+APP_BASE_URL=https://xivdyetools.app
+
+# OG image service URL
+OG_IMAGE_BASE_URL=https://og.xivdyetools.app

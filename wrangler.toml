@@ -1,0 +1,71 @@
+# XIV Dye Tools OpenGraph Worker
+# Serves dynamic OpenGraph metadata for social media previews
+# See: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "xivdyetools-og-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain routing - intercept requests to the main domain
+# The worker will:
+# 1. Detect if request is from a social media crawler
+# 2. If crawler: return HTML with dynamic OG meta tags
+# 3. If user: proxy to the SPA or redirect
+routes = [
+  { pattern = "xivdyetools.app/harmony/*", zone_name = "xivdyetools.app" },
+  { pattern = "xivdyetools.app/gradient/*", zone_name = "xivdyetools.app" },
+  { pattern = "xivdyetools.app/mixer/*", zone_name = "xivdyetools.app" },
+  { pattern = "xivdyetools.app/swatch/*", zone_name = "xivdyetools.app" },
+  { pattern = "xivdyetools.app/comparison/*", zone_name = "xivdyetools.app" },
+  { pattern = "xivdyetools.app/accessibility/*", zone_name = "xivdyetools.app" }
+]
+
+# ============================================================================
+# KV Namespace for caching generated OG images
+# Create with: wrangler kv:namespace create OG_CACHE
+# ============================================================================
+# [[kv_namespaces]]
+# binding = "OG_CACHE"
+# id = "YOUR_KV_NAMESPACE_ID"
+
+# ============================================================================
+# Analytics Engine for share/preview tracking
+# ============================================================================
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "xivdyetools_og_analytics"
+
+# ============================================================================
+# Environment Variables (non-sensitive)
+# ============================================================================
+[vars]
+# Base URL for the main app
+APP_BASE_URL = "https://xivdyetools.app"
+
+# OG image service URL (for og:image tags)
+# Will point to a separate image generation endpoint or same worker
+OG_IMAGE_BASE_URL = "https://og.xivdyetools.app"
+
+# ============================================================================
+# Binary file handling (fonts)
+# ============================================================================
+[[rules]]
+type = "Data"
+globs = ["**/*.ttf"]
+fallthrough = true
+
+# ============================================================================
+# Production Environment
+# ============================================================================
+[env.production]
+name = "xivdyetools-og-worker"
+
+[env.production.vars]
+APP_BASE_URL = "https://xivdyetools.app"
+OG_IMAGE_BASE_URL = "https://og.xivdyetools.app"
+
+# Analytics Engine
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "xivdyetools_og_analytics"
