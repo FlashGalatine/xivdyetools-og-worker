@@ -212,7 +212,7 @@ app.get('/og/gradient/:startId/:endId/:steps', async (c) => {
 });
 
 /**
- * Mixer tool OG image
+ * Mixer tool OG image (2 dyes)
  * Pattern: /og/mixer/:dyeAId/:dyeBId/:ratio.png
  */
 app.get('/og/mixer/:dyeAId/:dyeBId/:ratio', async (c) => {
@@ -232,6 +232,36 @@ app.get('/og/mixer/:dyeAId/:dyeBId/:ratio', async (c) => {
   const svg = generateMixerOG({
     dyeAId,
     dyeBId,
+    ratio: isNaN(ratio) ? 50 : ratio,
+    algorithm,
+  });
+
+  return renderOGImage(svg);
+});
+
+/**
+ * Mixer tool OG image (3 dyes)
+ * Pattern: /og/mixer/:dyeAId/:dyeBId/:dyeCId/:ratio.png
+ */
+app.get('/og/mixer/:dyeAId/:dyeBId/:dyeCId/:ratio', async (c) => {
+  const dyeAId = parseInt(c.req.param('dyeAId'), 10);
+  const dyeBId = parseInt(c.req.param('dyeBId'), 10);
+  const dyeCId = parseInt(c.req.param('dyeCId'), 10);
+  const ratio = parseInt(c.req.param('ratio').replace('.png', ''), 10);
+  const algorithm = (c.req.query('algo') || 'oklab') as MatchingAlgorithm;
+
+  trackAnalytics(c.env, {
+    event: 'og_image_request',
+    tool: 'mixer',
+    crawler: 'none',
+    cacheHit: false,
+    timestamp: Date.now(),
+  });
+
+  const svg = generateMixerOG({
+    dyeAId,
+    dyeBId,
+    dyeCId,
     ratio: isNaN(ratio) ? 50 : ratio,
     algorithm,
   });

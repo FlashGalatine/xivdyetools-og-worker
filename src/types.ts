@@ -88,6 +88,7 @@ export interface GradientParams {
 export interface MixerParams {
   dyeA: number; // itemID
   dyeB: number; // itemID
+  dyeC?: number; // itemID (optional third dye)
   ratio: number; // 0-100
   algo?: MatchingAlgorithm;
 }

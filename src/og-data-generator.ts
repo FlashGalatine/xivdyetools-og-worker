@@ -158,6 +158,7 @@ export function generateGradientOGData(params: GradientParams, env: Env): OGData
 export function generateMixerOGData(params: MixerParams, env: Env): OGData {
   const dyeA = getDyeInfo(params.dyeA);
   const dyeB = getDyeInfo(params.dyeB);
+  const dyeC = params.dyeC ? getDyeInfo(params.dyeC) : null;
 
   if (!dyeA || !dyeB) {
     return {
@@ -169,6 +170,19 @@ export function generateMixerOGData(params: MixerParams, env: Env): OGData {
     };
   }
 
+  // 3-dye mix
+  if (dyeC) {
+    return {
+      title: `${dyeA.name} + ${dyeB.name} + ${dyeC.name} | XIV Dye Tools`,
+      description: `Mix ${dyeA.name}, ${dyeB.name}, and ${dyeC.name} to find matching FFXIV dyes for your perfect blend!`,
+      url: `${env.APP_BASE_URL}/mixer/?dyeA=${params.dyeA}&dyeB=${params.dyeB}&dyeC=${params.dyeC}&v=1`,
+      imageUrl: `${env.OG_IMAGE_BASE_URL}/mixer/${params.dyeA}/${params.dyeB}/${params.dyeC}/${params.ratio}.png`,
+      siteName: 'XIV Dye Tools',
+      themeColor: dyeA.hex,
+    };
+  }
+
+  // 2-dye mix
   return {
     title: `${params.ratio}% ${dyeA.name} + ${100 - params.ratio}% ${dyeB.name} | XIV Dye Tools`,
     description: `Mix ${params.ratio}% ${dyeA.name} with ${100 - params.ratio}% ${dyeB.name} to find matching FFXIV dyes for your perfect blend!`,
@@ -392,9 +406,11 @@ export function generateOGDataForTool(
     }
 
     case 'mixer': {
+      const dyeCRaw = searchParams.get('dyeC');
       const params: MixerParams = {
         dyeA: parseInt(searchParams.get('dyeA') || '0', 10),
         dyeB: parseInt(searchParams.get('dyeB') || '0', 10),
+        dyeC: dyeCRaw ? parseInt(dyeCRaw, 10) : undefined,
         ratio: parseInt(searchParams.get('ratio') || '50', 10),
         algo: searchParams.get('algo') as MixerParams['algo'],
       };

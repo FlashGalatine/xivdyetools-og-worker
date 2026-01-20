@@ -33,6 +33,8 @@ export interface MixerOGOptions {
   dyeAId: number;
   /** Second dye itemID */
   dyeBId: number;
+  /** Third dye itemID (optional) */
+  dyeCId?: number;
   /** Mix ratio (0-100, percentage of dyeA) */
   ratio: number;
   /** Matching algorithm */
@@ -40,41 +42,92 @@ export interface MixerOGOptions {
 }
 
 /**
+ * Parses hex color to RGB components
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const cleanHex = hex.replace('#', '');
+  return {
+    r: parseInt(cleanHex.slice(0, 2), 16),
+    g: parseInt(cleanHex.slice(2, 4), 16),
+    b: parseInt(cleanHex.slice(4, 6), 16),
+  };
+}
+
+/**
+ * Converts RGB to hex string
+ */
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Mixes two hex colors at a given ratio
  */
 function mixColors(color1: string, color2: string, ratio: number): string {
-  const hex1 = color1.replace('#', '');
-  const hex2 = color2.replace('#', '');
-
-  const r1 = parseInt(hex1.slice(0, 2), 16);
-  const g1 = parseInt(hex1.slice(2, 4), 16);
-  const b1 = parseInt(hex1.slice(4, 6), 16);
-
-  const r2 = parseInt(hex2.slice(0, 2), 16);
-  const g2 = parseInt(hex2.slice(2, 4), 16);
-  const b2 = parseInt(hex2.slice(4, 6), 16);
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
 
   const mixRatio = ratio / 100;
-  const r = Math.round(r1 * mixRatio + r2 * (1 - mixRatio));
-  const g = Math.round(g1 * mixRatio + g2 * (1 - mixRatio));
-  const b = Math.round(b1 * mixRatio + b2 * (1 - mixRatio));
+  const r = Math.round(rgb1.r * mixRatio + rgb2.r * (1 - mixRatio));
+  const g = Math.round(rgb1.g * mixRatio + rgb2.g * (1 - mixRatio));
+  const b = Math.round(rgb1.b * mixRatio + rgb2.b * (1 - mixRatio));
 
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  return rgbToHex(r, g, b);
+}
+
+/**
+ * Mixes three hex colors in equal parts
+ */
+function mixThreeColors(color1: string, color2: string, color3: string): string {
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  const rgb3 = hexToRgb(color3);
+
+  const r = Math.round((rgb1.r + rgb2.r + rgb3.r) / 3);
+  const g = Math.round((rgb1.g + rgb2.g + rgb3.g) / 3);
+  const b = Math.round((rgb1.b + rgb2.b + rgb3.b) / 3);
+
+  return rgbToHex(r, g, b);
 }
 
 /**
  * Generates the Mixer tool OG image SVG
  */
 export function generateMixerOG(options: MixerOGOptions): string {
-  const { dyeAId, dyeBId, ratio, algorithm = 'oklab' } = options;
+  const { dyeAId, dyeBId, dyeCId, ratio, algorithm = 'oklab' } = options;
 
   // Look up the dyes
   const dyeA = getDyeByItemId(dyeAId);
   const dyeB = getDyeByItemId(dyeBId);
+  const dyeC = dyeCId ? getDyeByItemId(dyeCId) : null;
 
   if (!dyeA || !dyeB) {
-    return generateFallbackMixerOG(ratio, algorithm);
+    return generateFallbackMixerOG(ratio, algorithm, !!dyeC);
   }
+
+  // If dyeC was requested but not found, proceed with 2-dye mix
+  if (dyeCId && !dyeC) {
+    return generateTwoDyeMixerOG(dyeA, dyeB, ratio, algorithm);
+  }
+
+  // Route to appropriate generator
+  if (dyeC) {
+    return generateThreeDyeMixerOG(dyeA, dyeB, dyeC, algorithm);
+  }
+
+  return generateTwoDyeMixerOG(dyeA, dyeB, ratio, algorithm);
+}
+
+/**
+ * Generates OG image for 2-dye mix
+ */
+function generateTwoDyeMixerOG(
+  dyeA: ReturnType<typeof getDyeByItemId>,
+  dyeB: ReturnType<typeof getDyeByItemId>,
+  ratio: number,
+  algorithm: MatchingAlgorithm
+): string {
+  if (!dyeA || !dyeB) return generateFallbackMixerOG(ratio, algorithm, false);
 
   // Calculate mixed color
   const mixedHex = mixColors(dyeA.hex, dyeB.hex, ratio);
@@ -91,7 +144,6 @@ export function generateMixerOG(options: MixerOGOptions): string {
   // Layout: centered equation [DyeA] + [DyeB] = [Result]
   const swatchSize = 120;
   const operatorGap = 35;
-  const equationGap = 40;
 
   // Calculate total width: swatch + gap + "+" + gap + swatch + gap + "=" + gap + swatch
   const totalWidth = swatchSize * 3 + operatorGap * 4;
@@ -282,9 +334,220 @@ export function generateMixerOG(options: MixerOGOptions): string {
 }
 
 /**
+ * Generates OG image for 3-dye mix
+ *
+ * Layout:
+ * ┌──────────────────────────────────────────────────────┐
+ * │     ┌────┐           ┌────┐           ┌────┐        │
+ * │     │ A  │     +     │ B  │     +     │ C  │        │
+ * │     └────┘           └────┘           └────┘        │
+ * │   Dalamud Red     Snow White     Soot Black         │
+ * │                                                      │
+ * │                    ──────▼──────                     │
+ * │                    ┌────────────┐                    │
+ * │                    │   Result   │                    │
+ * │                    └────────────┘                    │
+ * │                     ≈ Ash Grey                       │
+ * └──────────────────────────────────────────────────────┘
+ */
+function generateThreeDyeMixerOG(
+  dyeA: NonNullable<ReturnType<typeof getDyeByItemId>>,
+  dyeB: NonNullable<ReturnType<typeof getDyeByItemId>>,
+  dyeC: NonNullable<ReturnType<typeof getDyeByItemId>>,
+  algorithm: MatchingAlgorithm
+): string {
+  // Calculate mixed color (equal parts)
+  const mixedHex = mixThreeColors(dyeA.hex, dyeB.hex, dyeC.hex);
+
+  // Find closest matching dye
+  const matches = findClosestDyesWithDistance(mixedHex, { limit: 1 });
+  const closestMatch = matches[0];
+
+  // Build content elements
+  const contentElements: string[] = [];
+  const { contentTop, contentHeight } = LAYOUT;
+  const centerX = OG_DIMENSIONS.width / 2;
+
+  // Layout constants
+  const inputSwatchSize = 90;
+  const resultSwatchSize = 110;
+  const operatorGap = 30;
+
+  // Top row: 3 input swatches with + operators
+  // Total width: swatch + gap + "+" + gap + swatch + gap + "+" + gap + swatch
+  const topRowWidth = inputSwatchSize * 3 + operatorGap * 4;
+  const topRowStartX = centerX - topRowWidth / 2;
+  const inputSwatchY = contentTop + 20;
+
+  // Positions for input dyes
+  const dyeAX = topRowStartX;
+  const plus1X = dyeAX + inputSwatchSize + operatorGap;
+  const dyeBX = plus1X + operatorGap;
+  const plus2X = dyeBX + inputSwatchSize + operatorGap;
+  const dyeCX = plus2X + operatorGap;
+
+  // Result row position (below inputs)
+  const resultY = inputSwatchY + inputSwatchSize + 75;
+  const resultX = centerX - resultSwatchSize / 2;
+
+  // ─── Input Dye A ───
+  contentElements.push(
+    rect(dyeAX, inputSwatchY, inputSwatchSize, inputSwatchSize, dyeA.hex, {
+      rx: 8,
+      stroke: '#ffffff',
+      strokeWidth: 2,
+    })
+  );
+
+  const dyeAName = dyeA.name.length > 10 ? dyeA.name.slice(0, 8) + '..' : dyeA.name;
+  contentElements.push(
+    text(dyeAX + inputSwatchSize / 2, inputSwatchY + inputSwatchSize + 18, dyeAName, {
+      fill: THEME.text,
+      fontSize: 12,
+      fontFamily: FONTS.primary,
+      fontWeight: 500,
+      textAnchor: 'middle',
+    })
+  );
+
+  // "+" operator 1
+  contentElements.push(
+    text(plus1X, inputSwatchY + inputSwatchSize / 2 + 6, '+', {
+      fill: THEME.textMuted,
+      fontSize: 28,
+      fontFamily: FONTS.header,
+      fontWeight: 300,
+      textAnchor: 'middle',
+    })
+  );
+
+  // ─── Input Dye B ───
+  contentElements.push(
+    rect(dyeBX, inputSwatchY, inputSwatchSize, inputSwatchSize, dyeB.hex, {
+      rx: 8,
+      stroke: '#ffffff',
+      strokeWidth: 2,
+    })
+  );
+
+  const dyeBName = dyeB.name.length > 10 ? dyeB.name.slice(0, 8) + '..' : dyeB.name;
+  contentElements.push(
+    text(dyeBX + inputSwatchSize / 2, inputSwatchY + inputSwatchSize + 18, dyeBName, {
+      fill: THEME.text,
+      fontSize: 12,
+      fontFamily: FONTS.primary,
+      fontWeight: 500,
+      textAnchor: 'middle',
+    })
+  );
+
+  // "+" operator 2
+  contentElements.push(
+    text(plus2X, inputSwatchY + inputSwatchSize / 2 + 6, '+', {
+      fill: THEME.textMuted,
+      fontSize: 28,
+      fontFamily: FONTS.header,
+      fontWeight: 300,
+      textAnchor: 'middle',
+    })
+  );
+
+  // ─── Input Dye C ───
+  contentElements.push(
+    rect(dyeCX, inputSwatchY, inputSwatchSize, inputSwatchSize, dyeC.hex, {
+      rx: 8,
+      stroke: '#ffffff',
+      strokeWidth: 2,
+    })
+  );
+
+  const dyeCName = dyeC.name.length > 10 ? dyeC.name.slice(0, 8) + '..' : dyeC.name;
+  contentElements.push(
+    text(dyeCX + inputSwatchSize / 2, inputSwatchY + inputSwatchSize + 18, dyeCName, {
+      fill: THEME.text,
+      fontSize: 12,
+      fontFamily: FONTS.primary,
+      fontWeight: 500,
+      textAnchor: 'middle',
+    })
+  );
+
+  // ─── Arrow pointing down ───
+  const arrowY = inputSwatchY + inputSwatchSize + 45;
+  contentElements.push(
+    text(centerX, arrowY, '▼', {
+      fill: THEME.accent,
+      fontSize: 20,
+      fontFamily: FONTS.primary,
+      textAnchor: 'middle',
+    })
+  );
+
+  // ─── Result swatch ───
+  contentElements.push(
+    rect(resultX, resultY, resultSwatchSize, resultSwatchSize, mixedHex, {
+      rx: 10,
+      stroke: THEME.accent,
+      strokeWidth: 3,
+    })
+  );
+
+  // Result hex (inside or below swatch)
+  contentElements.push(
+    text(centerX, resultY + resultSwatchSize + 20, mixedHex.toUpperCase(), {
+      fill: THEME.text,
+      fontSize: 14,
+      fontFamily: FONTS.mono,
+      fontWeight: 500,
+      textAnchor: 'middle',
+    })
+  );
+
+  // Closest match info
+  if (closestMatch) {
+    const matchName =
+      closestMatch.dye.name.length > 18
+        ? closestMatch.dye.name.slice(0, 16) + '..'
+        : closestMatch.dye.name;
+
+    contentElements.push(
+      text(centerX, resultY + resultSwatchSize + 42, `≈ ${matchName}`, {
+        fill: THEME.textMuted,
+        fontSize: 12,
+        fontFamily: FONTS.primary,
+        textAnchor: 'middle',
+      })
+    );
+
+    const deltaColor =
+      closestMatch.distance < 5
+        ? THEME.success
+        : closestMatch.distance < 10
+          ? THEME.warning
+          : THEME.error;
+
+    contentElements.push(
+      text(centerX, resultY + resultSwatchSize + 60, `Δ${closestMatch.distance.toFixed(1)}`, {
+        fill: deltaColor,
+        fontSize: 12,
+        fontFamily: FONTS.mono,
+        textAnchor: 'middle',
+      })
+    );
+  }
+
+  return generateOGCard({
+    toolName: 'Dye Mixer',
+    subtitle: '3-Dye Blend',
+    content: contentElements.join('\n'),
+    algorithm,
+  });
+}
+
+/**
  * Generates a fallback OG image when dyes are not found
  */
-function generateFallbackMixerOG(ratio: number, algorithm: MatchingAlgorithm): string {
+function generateFallbackMixerOG(ratio: number, algorithm: MatchingAlgorithm, isThreeDye: boolean): string {
   const contentElements: string[] = [];
   const { contentTop, contentHeight } = LAYOUT;
 
@@ -344,7 +607,7 @@ function generateFallbackMixerOG(ratio: number, algorithm: MatchingAlgorithm): s
 
   return generateOGCard({
     toolName: 'Dye Mixer',
-    subtitle: `${ratio}/${100 - ratio} Blend`,
+    subtitle: isThreeDye ? '3-Dye Blend' : `${ratio}/${100 - ratio} Blend`,
     content: contentElements.join('\n'),
     algorithm,
   });
