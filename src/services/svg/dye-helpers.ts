@@ -11,6 +11,8 @@ import {
   ColorConverter,
   CharacterColorService,
   type Dye,
+  type SubRace,
+  type Gender,
 } from '@xivdyetools/core';
 
 // Shared service instances
@@ -47,7 +49,7 @@ const SHARED_CATEGORY_NAMES: Record<string, string> = {
 /**
  * All subraces for searching race-specific colors
  */
-const ALL_SUBRACES = [
+const ALL_SUBRACES: SubRace[] = [
   'Midlander', 'Highlander', // Hyur
   'Wildwood', 'Duskwight', // Elezen
   'Plainsfolk', 'Dunesfolk', // Lalafell
@@ -56,9 +58,9 @@ const ALL_SUBRACES = [
   'Raen', 'Xaela', // Au Ra
   'Rava', 'Veena', // Viera
   'Helion', 'TheLost', // Hrothgar
-] as const;
+];
 
-const GENDERS = ['Male', 'Female'] as const;
+const GENDERS: Gender[] = ['Male', 'Female'];
 
 /**
  * Find a character color by its hex value.
@@ -67,11 +69,11 @@ const GENDERS = ['Male', 'Female'] as const;
  * @param hex - The hex color to look up (with or without #)
  * @returns The category and position info, or null if not found
  */
-export function findCharacterColorByHex(hex: string): CharacterColorLookup | null {
+export async function findCharacterColorByHex(hex: string): Promise<CharacterColorLookup | null> {
   // Normalize hex to uppercase with #
   const normalizedHex = hex.startsWith('#') ? hex.toUpperCase() : `#${hex.toUpperCase()}`;
 
-  // Search all shared categories first
+  // Search all shared categories first (sync)
   const sharedCategories = [
     'eyeColors',
     'highlightColors',
@@ -100,11 +102,11 @@ export function findCharacterColorByHex(hex: string): CharacterColorLookup | nul
     }
   }
 
-  // Search race-specific categories (hair and skin colors)
+  // Search race-specific categories (hair and skin colors) - async
   for (const subrace of ALL_SUBRACES) {
     for (const gender of GENDERS) {
       // Search hair colors
-      const hairColors = characterColorService.getHairColors(subrace, gender);
+      const hairColors = await characterColorService.getHairColors(subrace, gender);
       const foundHair = hairColors.find((c) => c.hex.toUpperCase() === normalizedHex);
       if (foundHair) {
         const col = (foundHair.index % 8) + 1;
@@ -118,7 +120,7 @@ export function findCharacterColorByHex(hex: string): CharacterColorLookup | nul
       }
 
       // Search skin colors
-      const skinColors = characterColorService.getSkinColors(subrace, gender);
+      const skinColors = await characterColorService.getSkinColors(subrace, gender);
       const foundSkin = skinColors.find((c) => c.hex.toUpperCase() === normalizedHex);
       if (foundSkin) {
         const col = (foundSkin.index % 8) + 1;
@@ -184,4 +186,135 @@ export function findClosestDyesWithDistance(
 export function getDyeByItemId(itemId: number): Dye | undefined {
   const allDyes = dyeService.getAllDyes();
   return allDyes.find((d) => d.itemID === itemId);
+}
+
+/**
+ * Extended character color lookup result with full context
+ */
+export interface CharacterColorContext extends CharacterColorLookup {
+  /** Full display name including race/gender if applicable */
+  fullName: string;
+  /** Whether this is a race-specific color sheet */
+  isRaceSpecific: boolean;
+  /** The subrace if race-specific */
+  subrace?: string;
+  /** The gender if race-specific */
+  gender?: 'Male' | 'Female';
+}
+
+/**
+ * Get character color info from explicit sheet/race/gender parameters.
+ * This is more accurate than searching by hex since it uses the exact context.
+ *
+ * @param hex - The hex color (with or without #)
+ * @param sheet - The color sheet category
+ * @param subrace - Subrace for race-specific sheets
+ * @param gender - Gender for race-specific sheets
+ * @returns Character color context or null if not found
+ */
+export async function getCharacterColorFromSheet(
+  hex: string,
+  sheet: string,
+  subrace?: string,
+  gender?: Gender
+): Promise<CharacterColorContext | null> {
+  const normalizedHex = hex.startsWith('#') ? hex.toUpperCase() : `#${hex.toUpperCase()}`;
+
+  // Race-specific sheets require subrace and gender
+  const isRaceSpecific = sheet === 'hairColors' || sheet === 'skinColors';
+
+  if (isRaceSpecific) {
+    if (!subrace || !gender) {
+      // Fall back to hex search if race/gender not provided
+      const fallback = await findCharacterColorByHex(normalizedHex);
+      if (fallback) {
+        return {
+          ...fallback,
+          fullName: fallback.categoryName,
+          isRaceSpecific: true,
+          subrace: undefined,
+          gender: undefined,
+        };
+      }
+      return null;
+    }
+
+    // Get colors from the specific race/gender combination
+    const colors =
+      sheet === 'hairColors'
+        ? await characterColorService.getHairColors(subrace as SubRace, gender)
+        : await characterColorService.getSkinColors(subrace as SubRace, gender);
+
+    const found = colors.find((c) => c.hex.toUpperCase() === normalizedHex);
+    if (found) {
+      const col = (found.index % 8) + 1;
+      const row = Math.floor(found.index / 8) + 1;
+
+      // Format display name like "Female Wildwood Hair Colors"
+      const sheetDisplayName = sheet === 'hairColors' ? 'Hair Colors' : 'Skin Colors';
+      const fullName = `${gender} ${formatSubraceName(subrace)} ${sheetDisplayName}`;
+
+      return {
+        categoryName: sheetDisplayName,
+        fullName,
+        index: found.index,
+        row,
+        col,
+        isRaceSpecific: true,
+        subrace,
+        gender,
+      };
+    }
+    return null;
+  }
+
+  // Shared color sheets (sync)
+  const sharedCategory = sheet as
+    | 'eyeColors'
+    | 'highlightColors'
+    | 'lipColorsDark'
+    | 'lipColorsLight'
+    | 'tattooColors'
+    | 'facePaintColorsDark'
+    | 'facePaintColorsLight';
+
+  const colors = characterColorService.getSharedColors(sharedCategory);
+  const found = colors.find((c) => c.hex.toUpperCase() === normalizedHex);
+
+  if (found) {
+    const col = (found.index % 8) + 1;
+    const row = Math.floor(found.index / 8) + 1;
+    const categoryName = SHARED_CATEGORY_NAMES[sheet] || sheet;
+
+    return {
+      categoryName,
+      fullName: categoryName,
+      index: found.index,
+      row,
+      col,
+      isRaceSpecific: false,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Format subrace name for display (add spaces to camelCase)
+ */
+function formatSubraceName(subrace: string): string {
+  // Handle special cases
+  const specialCases: Record<string, string> = {
+    SeekerOfTheSun: "Seeker of the Sun",
+    KeeperOfTheMoon: "Keeper of the Moon",
+    SeaWolf: "Sea Wolf",
+    TheLost: "The Lost",
+  };
+
+  if (specialCases[subrace]) {
+    return specialCases[subrace];
+  }
+
+  // Simple names like "Midlander", "Wildwood" stay as-is
+  return subrace;
 }

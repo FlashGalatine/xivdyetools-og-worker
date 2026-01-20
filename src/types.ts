@@ -93,10 +93,33 @@ export interface MixerParams {
   algo?: MatchingAlgorithm;
 }
 
+/** Color sheet category types */
+export type ColorSheetCategory =
+  | 'eyeColors'
+  | 'highlightColors'
+  | 'lipColorsDark'
+  | 'lipColorsLight'
+  | 'tattooColors'
+  | 'facePaintColorsDark'
+  | 'facePaintColorsLight'
+  | 'hairColors'
+  | 'skinColors';
+
+/** Gender for race-specific color sheets */
+export type CharacterGender = 'Male' | 'Female';
+
 export interface SwatchParams {
   color: string; // hex without #
   algo?: MatchingAlgorithm;
   limit?: number;
+  /** Which color sheet this color is from */
+  sheet?: ColorSheetCategory;
+  /** Subrace for race-specific sheets (hairColors, skinColors) */
+  race?: string;
+  /** Gender for race-specific sheets */
+  gender?: CharacterGender;
+  /** Index within the color sheet (for calculating row/col) */
+  index?: number;
 }
 
 export interface ComparisonParams {

@@ -20,6 +20,8 @@ import type {
   AccessibilityParams,
   HarmonyType,
   VisionType,
+  ColorSheetCategory,
+  CharacterGender,
   Env,
 } from './types';
 
@@ -54,6 +56,18 @@ const VISION_NAMES: Record<VisionType, string> = {
   deuteranopia: 'Deuteranopia',
   tritanopia: 'Tritanopia',
   achromatopsia: 'Achromatopsia',
+};
+
+const SHEET_NAMES: Record<ColorSheetCategory, string> = {
+  eyeColors: 'Eye Colors',
+  highlightColors: 'Highlights',
+  lipColorsDark: 'Lip Colors (Dark)',
+  lipColorsLight: 'Lip Colors (Light)',
+  tattooColors: 'Tattoo/Limbal',
+  facePaintColorsDark: 'Face Paint (Dark)',
+  facePaintColorsLight: 'Face Paint (Light)',
+  hairColors: 'Hair Colors',
+  skinColors: 'Skin Colors',
 };
 
 // ============================================================================
@@ -199,12 +213,46 @@ export function generateMixerOGData(params: MixerParams, env: Env): OGData {
 export function generateSwatchOGData(params: SwatchParams, env: Env): OGData {
   const hexColor = formatHex(params.color);
   const limit = params.limit || 5;
+  const { sheet, race, gender } = params;
+
+  // Build description based on available context
+  let description = `Find the top ${limit} FFXIV dyes that match ${hexColor}.`;
+
+  if (sheet) {
+    const isRaceSpecific = sheet === 'hairColors' || sheet === 'skinColors';
+    if (isRaceSpecific && race && gender) {
+      description = `Find FFXIV dyes matching this ${gender} ${race} ${SHEET_NAMES[sheet].toLowerCase()} (${hexColor}).`;
+    } else {
+      description = `Find FFXIV dyes matching this ${SHEET_NAMES[sheet].toLowerCase()} (${hexColor}).`;
+    }
+  } else {
+    description += ' Perfect for matching character colors or custom palettes!';
+  }
+
+  // Build the web app URL with all params
+  const urlParams = new URLSearchParams();
+  urlParams.set('color', params.color);
+  urlParams.set('limit', String(limit));
+  if (sheet) urlParams.set('sheet', sheet);
+  if (race) urlParams.set('race', race);
+  if (gender) urlParams.set('gender', gender);
+  if (params.algo) urlParams.set('algo', params.algo);
+  urlParams.set('v', '1');
+
+  // Build the OG image URL with query params for sheet context
+  const imageUrlParams = new URLSearchParams();
+  if (sheet) imageUrlParams.set('sheet', sheet);
+  if (race) imageUrlParams.set('race', race);
+  if (gender) imageUrlParams.set('gender', gender);
+  if (params.algo) imageUrlParams.set('algo', params.algo);
+  const imageQueryString = imageUrlParams.toString();
+  const imageUrl = `${env.OG_IMAGE_BASE_URL}/swatch/${params.color}/${limit}.png${imageQueryString ? `?${imageQueryString}` : ''}`;
 
   return {
     title: `Match ${hexColor} | XIV Dye Tools`,
-    description: `Find the top ${limit} FFXIV dyes that match ${hexColor}. Perfect for matching character colors or custom palettes!`,
-    url: `${env.APP_BASE_URL}/swatch/?color=${params.color}&limit=${limit}&v=1`,
-    imageUrl: `${env.OG_IMAGE_BASE_URL}/swatch/${params.color}/${limit}.png`,
+    description,
+    url: `${env.APP_BASE_URL}/swatch/?${urlParams.toString()}`,
+    imageUrl,
     siteName: 'XIV Dye Tools',
     themeColor: hexColor,
   };
@@ -422,6 +470,9 @@ export function generateOGDataForTool(
         color: searchParams.get('color') || 'FFFFFF',
         algo: searchParams.get('algo') as SwatchParams['algo'],
         limit: parseInt(searchParams.get('limit') || '5', 10),
+        sheet: searchParams.get('sheet') as ColorSheetCategory | undefined,
+        race: searchParams.get('race') || undefined,
+        gender: searchParams.get('gender') as CharacterGender | undefined,
       };
       return generateSwatchOGData(params, env);
     }

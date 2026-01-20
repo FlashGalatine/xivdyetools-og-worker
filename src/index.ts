@@ -271,12 +271,17 @@ app.get('/og/mixer/:dyeAId/:dyeBId/:dyeCId/:ratio', async (c) => {
 
 /**
  * Swatch tool OG image
- * Pattern: /og/swatch/:color/:limit.png
+ * Pattern: /og/swatch/:color/:limit.png?sheet=X&race=Y&gender=Z
  */
 app.get('/og/swatch/:color/:limit', async (c) => {
   const color = c.req.param('color');
   const limit = parseInt(c.req.param('limit').replace('.png', ''), 10);
   const algorithm = (c.req.query('algo') || 'oklab') as MatchingAlgorithm;
+
+  // Parse optional sheet context params
+  const sheet = c.req.query('sheet') as import('./types').ColorSheetCategory | undefined;
+  const race = c.req.query('race') || undefined;
+  const gender = c.req.query('gender') as import('./types').CharacterGender | undefined;
 
   trackAnalytics(c.env, {
     event: 'og_image_request',
@@ -286,10 +291,13 @@ app.get('/og/swatch/:color/:limit', async (c) => {
     timestamp: Date.now(),
   });
 
-  const svg = generateSwatchOG({
+  const svg = await generateSwatchOG({
     color,
     limit: isNaN(limit) ? 5 : limit,
     algorithm,
+    sheet,
+    race,
+    gender,
   });
 
   return renderOGImage(svg);

@@ -27,8 +27,8 @@
 import { type Dye } from '@xivdyetools/core';
 import { rect, text, getContrastTextColor, THEME, FONTS, OG_DIMENSIONS } from './base';
 import { generateOGCard, LAYOUT } from './og-card';
-import { findClosestDyesWithDistance, findCharacterColorByHex } from './dye-helpers';
-import type { MatchingAlgorithm } from '../../types';
+import { findClosestDyesWithDistance, findCharacterColorByHex, getCharacterColorFromSheet, type CharacterColorContext } from './dye-helpers';
+import type { MatchingAlgorithm, ColorSheetCategory, CharacterGender } from '../../types';
 
 export interface SwatchOGOptions {
   /** Input color hex (without #) */
@@ -37,13 +37,19 @@ export interface SwatchOGOptions {
   limit: number;
   /** Matching algorithm */
   algorithm?: MatchingAlgorithm;
+  /** Which color sheet this color is from */
+  sheet?: ColorSheetCategory;
+  /** Subrace for race-specific sheets (hairColors, skinColors) */
+  race?: string;
+  /** Gender for race-specific sheets */
+  gender?: CharacterGender;
 }
 
 /**
  * Generates the Swatch tool OG image SVG
  */
-export function generateSwatchOG(options: SwatchOGOptions): string {
-  const { color, limit = 5, algorithm = 'oklab' } = options;
+export async function generateSwatchOG(options: SwatchOGOptions): Promise<string> {
+  const { color, limit = 5, algorithm = 'oklab', sheet, race, gender } = options;
 
   // Ensure hex has # prefix
   const hexColor = color.startsWith('#') ? color : `#${color}`;
@@ -137,7 +143,17 @@ export function generateSwatchOG(options: SwatchOGOptions): string {
   );
 
   // Show input color's position in character creator (if it's a known character color)
-  const characterColorInfo = findCharacterColorByHex(hexColor);
+  // Use explicit sheet/race/gender params when available for more accurate display
+  let characterColorInfo: CharacterColorContext | null = null;
+  if (sheet) {
+    characterColorInfo = await getCharacterColorFromSheet(hexColor, sheet, race, gender);
+  } else {
+    const basic = await findCharacterColorByHex(hexColor);
+    characterColorInfo = basic
+      ? { ...basic, fullName: basic.categoryName, isRaceSpecific: false }
+      : null;
+  }
+
   if (characterColorInfo) {
     contentElements.push(
       text(leftCardX + leftCardWidth / 2, inputSwatchY + inputSwatchSize + 55, 'FROM', {
@@ -149,10 +165,15 @@ export function generateSwatchOG(options: SwatchOGOptions): string {
       })
     );
 
+    // Use fullName for race-specific sheets (e.g., "Female Wildwood Hair Colors")
+    // or categoryName for shared sheets (e.g., "Eye Colors")
+    const displayName = characterColorInfo.fullName || characterColorInfo.categoryName;
+    const nameFontSize = displayName.length > 25 ? 11 : displayName.length > 18 ? 12 : 14;
+
     contentElements.push(
-      text(leftCardX + leftCardWidth / 2, inputSwatchY + inputSwatchSize + 75, characterColorInfo.categoryName, {
+      text(leftCardX + leftCardWidth / 2, inputSwatchY + inputSwatchSize + 75, displayName, {
         fill: THEME.text,
-        fontSize: 14,
+        fontSize: nameFontSize,
         fontFamily: FONTS.primary,
         fontWeight: 500,
         textAnchor: 'middle',
