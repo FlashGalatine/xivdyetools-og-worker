@@ -372,12 +372,20 @@ function generateThreeDyeMixerOG(
   const inputSwatchSize = 90;
   const resultSwatchSize = 110;
   const operatorGap = 30;
+  const inputLabelHeight = 25;
+  const arrowGapHeight = 55;
+  const resultLabelHeight = 65;
+
+  // Calculate total visual height for vertical centering
+  const totalVisualHeight = inputSwatchSize + inputLabelHeight + arrowGapHeight + resultSwatchSize + resultLabelHeight;
+  // Center content vertically with offset to account for header/footer visual weight
+  const contentStartY = contentTop + (contentHeight - totalVisualHeight) / 2 + 3;
 
   // Top row: 3 input swatches with + operators
   // Total width: swatch + gap + "+" + gap + swatch + gap + "+" + gap + swatch
   const topRowWidth = inputSwatchSize * 3 + operatorGap * 4;
   const topRowStartX = centerX - topRowWidth / 2;
-  const inputSwatchY = contentTop + 20;
+  const inputSwatchY = contentStartY;
 
   // Positions for input dyes
   const dyeAX = topRowStartX;
@@ -387,7 +395,7 @@ function generateThreeDyeMixerOG(
   const dyeCX = plus2X + operatorGap;
 
   // Result row position (below inputs)
-  const resultY = inputSwatchY + inputSwatchSize + 75;
+  const resultY = inputSwatchY + inputSwatchSize + inputLabelHeight + arrowGapHeight;
   const resultX = centerX - resultSwatchSize / 2;
 
   // ─── Input Dye A ───
@@ -473,7 +481,7 @@ function generateThreeDyeMixerOG(
   );
 
   // ─── Arrow pointing down ───
-  const arrowY = inputSwatchY + inputSwatchSize + 45;
+  const arrowY = inputSwatchY + inputSwatchSize + inputLabelHeight + (arrowGapHeight / 2);
   contentElements.push(
     text(centerX, arrowY, '▼', {
       fill: THEME.accent,

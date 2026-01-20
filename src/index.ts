@@ -23,6 +23,8 @@ import {
   generateGradientOG,
   generateMixerOG,
   generateSwatchOG,
+  generateComparisonOG,
+  generateAccessibilityOG,
   generateOGCard,
   THEME,
   FONTS,
@@ -31,7 +33,7 @@ import {
   text,
   circle,
 } from './services/svg';
-import type { Env, ToolId, AnalyticsEvent, HarmonyType, MatchingAlgorithm } from './types';
+import type { Env, ToolId, AnalyticsEvent, HarmonyType, MatchingAlgorithm, VisionType } from './types';
 
 // ============================================================================
 // Constants
@@ -298,6 +300,54 @@ app.get('/og/swatch/:color/:limit', async (c) => {
     sheet,
     race,
     gender,
+  });
+
+  return renderOGImage(svg);
+});
+
+/**
+ * Comparison tool OG image
+ * Pattern: /og/comparison/:dyes.png
+ * where dyes is comma-separated itemIDs (e.g., "5771,5772,5773")
+ */
+app.get('/og/comparison/:dyes', async (c) => {
+  const dyesParam = c.req.param('dyes').replace('.png', '');
+  const dyeIds = dyesParam.split(',').map((id) => parseInt(id, 10)).filter((id) => !isNaN(id));
+
+  trackAnalytics(c.env, {
+    event: 'og_image_request',
+    tool: 'comparison',
+    crawler: 'none',
+    cacheHit: false,
+    timestamp: Date.now(),
+  });
+
+  const svg = generateComparisonOG({ dyeIds });
+
+  return renderOGImage(svg);
+});
+
+/**
+ * Accessibility tool OG image
+ * Pattern: /og/accessibility/:dyes/:visionType.png
+ */
+app.get('/og/accessibility/:dyes/:visionType', async (c) => {
+  const dyesParam = c.req.param('dyes');
+  const visionTypeRaw = c.req.param('visionType').replace('.png', '');
+  const visionType = visionTypeRaw.toLowerCase() as VisionType;
+  const dyeIds = dyesParam.split(',').map((id) => parseInt(id, 10)).filter((id) => !isNaN(id));
+
+  trackAnalytics(c.env, {
+    event: 'og_image_request',
+    tool: 'accessibility',
+    crawler: 'none',
+    cacheHit: false,
+    timestamp: Date.now(),
+  });
+
+  const svg = generateAccessibilityOG({
+    dyeIds,
+    visionType,
   });
 
   return renderOGImage(svg);

@@ -19,6 +19,12 @@ export type { MixerOGOptions } from './mixer';
 export { generateSwatchOG } from './swatch';
 export type { SwatchOGOptions } from './swatch';
 
+export { generateComparisonOG } from './comparison';
+export type { ComparisonOGOptions } from './comparison';
+
+export { generateAccessibilityOG } from './accessibility';
+export type { AccessibilityOGOptions } from './accessibility';
+
 // Base utilities
 export * from './base';
 

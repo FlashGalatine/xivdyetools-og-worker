@@ -280,7 +280,7 @@ export function generateComparisonOGData(params: ComparisonParams, env: Env): OG
     title: `Compare: ${dyeNames} | XIV Dye Tools`,
     description: `Side-by-side comparison of ${dyes.length} FFXIV dyes: ${dyeNames}. See how they look together!`,
     url: `${env.APP_BASE_URL}/comparison/?dyes=${params.dyes.join(',')}&v=1`,
-    imageUrl: `${env.OG_IMAGE_BASE_URL}/comparison/${params.dyes.join('-')}.png`,
+    imageUrl: `${env.OG_IMAGE_BASE_URL}/comparison/${params.dyes.join(',')}.png`,
     siteName: 'XIV Dye Tools',
     themeColor: dyes[0]!.hex,
   };
@@ -309,7 +309,7 @@ export function generateAccessibilityOGData(params: AccessibilityParams, env: En
     title: `${visionName}: ${dyeNames} | XIV Dye Tools`,
     description: `See how ${dyeNames} appear with ${visionName.toLowerCase()}. Design inclusive glamours!`,
     url: `${env.APP_BASE_URL}/accessibility/?dyes=${params.dyes.join(',')}&vision=${params.vision || 'normal'}&v=1`,
-    imageUrl: `${env.OG_IMAGE_BASE_URL}/accessibility/${params.dyes.join('-')}/${params.vision || 'normal'}.png`,
+    imageUrl: `${env.OG_IMAGE_BASE_URL}/accessibility/${params.dyes.join(',')}/${params.vision || 'normal'}.png`,
     siteName: 'XIV Dye Tools',
     themeColor: dyes[0]!.hex,
   };
