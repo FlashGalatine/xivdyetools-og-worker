@@ -19,15 +19,15 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20251205.0",
+    "@cloudflare/workers-types": "^4.20260124.0",
     "@resvg/resvg-wasm": "^2.6.2",
-    "@xivdyetools/core": "^1.14.0",
+    "@xivdyetools/core": "^1.15.1",
     "@xivdyetools/types": "^1.7.0",
-    "hono": "^4.11.4"
+    "hono": "^4.11.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-v8": "^4.0.18",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15",
     "wrangler": "^4.59.1"
