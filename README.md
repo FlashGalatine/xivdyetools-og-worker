@@ -1,3 +1,5 @@
+# NOTICE! This repo has been DEPRECATED! For the latest updates to the XIV Dye Tools app, see the mono-repo here: https://github.com/FlashGalatine/xivdyetools
+
 # XIV Dye Tools OpenGraph Worker
 
 A Cloudflare Worker that serves dynamic OpenGraph metadata for XIV Dye Tools, enabling rich social media previews when users share links on Discord, Twitter, Facebook, and other platforms.
